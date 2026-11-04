@@ -1,0 +1,209 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+  #nota-root *, #nota-root *::before, #nota-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  #nota-root textarea, #nota-root input { font-family: 'Lora', Georgia, serif; }
+  #nota-root button { cursor: pointer; }
+  #nota-root ::-webkit-scrollbar { width: 3px; }
+  #nota-root ::-webkit-scrollbar-thumb { border-radius: 3px; }
+  #nota-root .note-item { transition: background 0.12s; }
+  #nota-root .note-item:hover .del-btn { opacity: 0.55 !important; }
+  #nota-root .del-btn { opacity: 0 !important; transition: opacity 0.15s; }
+  #nota-root .del-btn:hover { opacity: 1 !important; }
+  #nota-root .theme-dot { transition: transform 0.15s; }
+  #nota-root .theme-dot:hover { transform: scale(1.18); }
+  #nota-root .plus-btn:hover { opacity: 0.85; transform: scale(1.06); }
+  #nota-root .plus-btn:active { transform: scale(0.95); }
+  #nota-root .plus-btn { transition: opacity 0.15s, transform 0.12s; }
+  #nota-root .sidebar-wrap { transition: width 0.3s cubic-bezier(0.4,0,0.2,1), min-width 0.3s cubic-bezier(0.4,0,0.2,1); }
+  #nota-root .sidebar-content { transition: opacity 0.2s; }
+  #nota-root .hbtn:hover { background: var(--color-background-secondary) !important; }
+</style>
+
+<div id="nota-root" style="height:560px; overflow:hidden; border-radius:var(--border-radius-lg); border:0.5px solid var(--color-border-tertiary);"></div>
+
+<script>
+(function(){
+  const THEMES = [
+    { id:"amber",  name:"Amber",  accent:"#BA7517", bg:"#FAEEDA", soft:"#FAC775", text:"#412402" },
+    { id:"teal",   name:"Teal",   accent:"#0F6E56", bg:"#E1F5EE", soft:"#9FE1CB", text:"#04342C" },
+    { id:"purple", name:"Purple", accent:"#534AB7", bg:"#EEEDFE", soft:"#CECBF6", text:"#26215C" },
+    { id:"blue",   name:"Blue",   accent:"#185FA5", bg:"#E6F1FB", soft:"#B5D4F4", text:"#042C53" },
+    { id:"coral",  name:"Coral",  accent:"#993C1D", bg:"#FAECE7", soft:"#F5C4B3", text:"#4A1B0C" },
+    { id:"pink",   name:"Pink",   accent:"#993556", bg:"#FBEAF0", soft:"#F4C0D1", text:"#4B1528" },
+  ];
+  const SEED = [
+    { id:1, title:"Welcome to Nota", body:"This is your personal writing space.\n\nUse the sidebar to browse notes, the + button to create new ones, and the colour dots to change themes.", date: Date.now()-86400000*3 },
+    { id:2, title:"Shopping list",   body:"• Olive oil\n• Cherry tomatoes\n• Fresh pasta\n• Basil\n• Parmesan", date: Date.now()-86400000 },
+    { id:3, title:"Book ideas",      body:"Atomic Habits — James Clear\nDeep Work — Cal Newport\nFour Thousand Weeks — Oliver Burkeman\n\nTheme: intentional living", date: Date.now() },
+  ];
+  function fmt(ts){ return new Date(ts).toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
+  function fmtLong(ts){ return new Date(ts).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
+  function wc(s){ return s.trim() ? s.trim().split(/\s+/).length : 0; }
+
+  let themeIdx=0, sidebarOpen=true;
+  let notes = SEED.map(n=>({...n}));
+  let activeId=SEED[0].id, title=SEED[0].title, body=SEED[0].body;
+
+  const root = document.getElementById("nota-root");
+
+  function saveActive(){
+    notes = notes.map(n => n.id===activeId ? {...n, title, body} : n);
+  }
+
+  function switchTo(note){
+    saveActive();
+    activeId=note.id; title=note.title; body=note.body;
+    render();
+  }
+
+  function createNote(){
+    saveActive();
+    const fresh={id:Date.now(), title:"New note", body:"", date:Date.now()};
+    notes=[fresh,...notes];
+    activeId=fresh.id; title=fresh.title; body=fresh.body;
+    render();
+    setTimeout(()=>{ const ta=document.getElementById("nota-body"); if(ta) ta.focus(); },60);
+  }
+
+  function deleteNote(id){
+    notes=notes.filter(n=>n.id!==id);
+    if(id===activeId){
+      if(notes.length){ activeId=notes[0].id; title=notes[0].title; body=notes[0].body; }
+      else { activeId=null; title=""; body=""; }
+    }
+    render();
+  }
+
+  function render(){
+    const t=THEMES[themeIdx];
+    const an=notes.find(n=>n.id===activeId);
+    const words=wc(body), chars=body.length;
+
+    root.innerHTML=`
+    <div style="display:flex;flex-direction:column;height:100%;font-family:'Lora',Georgia,serif;background:var(--color-background-primary);color:var(--color-text-primary);">
+
+      <!-- TOP BAR -->
+      <header style="height:50px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);">
+        <div style="display:flex;align-items:center;gap:11px;">
+          <button id="nota-toggle" class="hbtn" style="width:32px;height:32px;background:none;border:0.5px solid var(--color-border-secondary);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
+            <span style="display:block;width:13px;height:1.5px;background:${t.accent};border-radius:1px;"></span>
+            <span style="display:block;width:13px;height:1.5px;background:${t.accent};border-radius:1px;opacity:${sidebarOpen?0.3:1};"></span>
+            <span style="display:block;width:13px;height:1.5px;background:${t.accent};border-radius:1px;"></span>
+          </button>
+          <span style="font-family:'Playfair Display',serif;font-weight:700;font-size:19px;letter-spacing:-0.4px;color:${t.accent};user-select:none;">Nota</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:13px;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            ${THEMES.map((th,i)=>`<button class="theme-dot" data-tidx="${i}" title="${th.name}" style="width:16px;height:16px;border-radius:50%;background:${th.accent};border:none;outline:${themeIdx===i?`2px solid ${th.accent}`:'2px solid transparent'};outline-offset:2px;transform:${themeIdx===i?'scale(1.18)':'scale(1)'};"></button>`).join("")}
+          </div>
+          <button id="nota-new" class="plus-btn" style="width:32px;height:32px;border-radius:8px;background:${t.accent};border:none;color:#fff;font-size:21px;font-weight:300;line-height:1;display:flex;align-items:center;justify-content:center;">+</button>
+        </div>
+      </header>
+
+      <!-- BODY -->
+      <div style="display:flex;flex:1;overflow:hidden;">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar-wrap" style="width:${sidebarOpen?'236px':'0'};min-width:${sidebarOpen?'236px':'0'};overflow:hidden;border-right:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);display:flex;flex-direction:column;">
+          <div class="sidebar-content" style="width:236px;height:100%;display:flex;flex-direction:column;opacity:${sidebarOpen?1:0};">
+            <div style="padding:9px 13px 8px;border-bottom:0.5px solid var(--color-border-tertiary);">
+              <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.3px;color:${t.accent};font-family:sans-serif;font-weight:600;">${notes.length} ${notes.length===1?'Note':'Notes'}</span>
+            </div>
+            <div style="overflow-y:auto;flex:1;padding:5px 5px;">
+              ${notes.length===0?`<p style="padding:20px 10px;font-size:12px;color:var(--color-text-tertiary);font-style:italic;text-align:center;">No notes yet</p>`:''}
+              ${notes.map(note=>{
+                const isA=note.id===activeId;
+                const pTitle=isA?(title||'Untitled'):(note.title||'Untitled');
+                const pBody=isA?body:note.body;
+                return `<div class="note-item" data-nid="${note.id}" style="padding:9px 9px 7px;border-radius:8px;margin-bottom:2px;background:${isA?t.bg:'transparent'};border-left:3px solid ${isA?t.accent:'transparent'};position:relative;cursor:pointer;">
+                  <div style="display:flex;align-items:flex-start;gap:4px;">
+                    <p style="font-family:'Playfair Display',serif;font-weight:600;font-size:12.5px;line-height:1.35;color:${isA?t.text:'var(--color-text-primary)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${pTitle}</p>
+                    <button class="del-btn" data-did="${note.id}" style="background:none;border:none;font-size:15px;color:var(--color-text-secondary);line-height:1;padding:0;flex-shrink:0;margin-top:-1px;">×</button>
+                  </div>
+                  <p style="font-size:11px;color:var(--color-text-secondary);line-height:1.4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(pBody?.split('\n')[0])||'No content…'}</p>
+                  <p style="font-size:10px;color:${t.accent};margin-top:5px;font-family:sans-serif;font-weight:500;">${fmt(note.date)}</p>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+        </aside>
+
+        <!-- EDITOR -->
+        <main style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          ${an ? `
+            <div style="padding:24px 36px 13px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0;">
+              <input id="nota-title" value="${title.replace(/"/g,'&quot;')}" placeholder="Note title…" style="width:100%;border:none;background:transparent;outline:none;font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:23px;letter-spacing:-0.3px;color:var(--color-text-primary);" />
+              <p style="font-size:11px;color:${t.accent};margin-top:6px;font-family:sans-serif;font-weight:500;">${fmtLong(an.date)}</p>
+            </div>
+            <textarea id="nota-body" placeholder="Start writing…" style="flex:1;border:none;background:transparent;outline:none;padding:18px 36px;font-size:15px;line-height:1.9;color:var(--color-text-primary);resize:none;font-family:'Lora',Georgia,serif;">${body.replace(/</g,'&lt;')}</textarea>
+            <div style="padding:7px 36px;border-top:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:14px;flex-shrink:0;">
+              <span style="font-size:11px;color:var(--color-text-tertiary);font-family:sans-serif;">${words} ${words===1?'word':'words'}</span>
+              <span style="font-size:11px;color:var(--color-text-tertiary);font-family:sans-serif;">${chars} ${chars===1?'char':'chars'}</span>
+            </div>
+          ` : `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;">
+              <svg width="44" height="44" viewBox="0 0 48 48" fill="none" style="opacity:0.2;"><rect x="8" y="6" width="32" height="36" rx="4" stroke="currentColor" stroke-width="1.5"/><line x1="15" y1="16" x2="33" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="15" y1="22" x2="33" y2="22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="15" y1="28" x2="25" y2="28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <p style="font-family:'Playfair Display',serif;font-style:italic;font-size:17px;color:var(--color-text-tertiary);">No note open</p>
+              <button id="nota-create-empty" style="padding:8px 20px;border-radius:8px;background:${t.accent};border:none;color:#fff;font-family:sans-serif;font-size:13px;">Create a note</button>
+            </div>
+          `}
+        </main>
+      </div>
+    </div>`;
+
+    document.getElementById("nota-toggle")?.addEventListener("click",()=>{ sidebarOpen=!sidebarOpen; render(); });
+    document.getElementById("nota-new")?.addEventListener("click", createNote);
+    document.getElementById("nota-create-empty")?.addEventListener("click", createNote);
+
+    root.querySelectorAll(".theme-dot").forEach(btn=>{
+      btn.addEventListener("click",()=>{ themeIdx=parseInt(btn.dataset.tidx); render(); });
+    });
+
+    root.querySelectorAll(".note-item").forEach(item=>{
+      item.addEventListener("click",e=>{
+        if(e.target.classList.contains("del-btn")) return;
+        const nid=parseInt(item.dataset.nid);
+        const note=notes.find(n=>n.id===nid);
+        if(note && note.id!==activeId) switchTo(note);
+      });
+    });
+
+    root.querySelectorAll(".del-btn").forEach(btn=>{
+      btn.addEventListener("click",e=>{ e.stopPropagation(); deleteNote(parseInt(btn.dataset.did)); });
+    });
+
+    const ti=document.getElementById("nota-title");
+    if(ti){ ti.addEventListener("input",e=>{ title=e.target.value; notes=notes.map(n=>n.id===activeId?{...n,title}:n); renderSidebarPreviews(); }); }
+
+    const ta=document.getElementById("nota-body");
+    if(ta){ ta.addEventListener("input",e=>{ body=e.target.value; notes=notes.map(n=>n.id===activeId?{...n,body}:n); renderSidebarPreviews(); updateFooter(); }); }
+  }
+
+  function updateFooter(){
+    const words=wc(body), chars=body.length;
+    const spans=root.querySelectorAll("footer-stat, [data-footer]");
+    const footer=root.querySelector("[data-footer-words]");
+    if(footer) footer.textContent=`${words} ${words===1?'word':'words'}`;
+    const fc=root.querySelector("[data-footer-chars]");
+    if(fc) fc.textContent=`${chars} ${chars===1?'char':'chars'}`;
+  }
+
+  function renderSidebarPreviews(){
+    const t=THEMES[themeIdx];
+    notes.forEach(note=>{
+      const isA=note.id===activeId;
+      const item=root.querySelector(`[data-nid="${note.id}"]`);
+      if(!item) return;
+      const pTitle=isA?(title||'Untitled'):(note.title||'Untitled');
+      const pBody=isA?body:note.body;
+      const tp=item.querySelector("p:first-of-type");
+      if(tp) tp.textContent=pTitle;
+      const bp=item.querySelectorAll("p")[1];
+      if(bp) bp.textContent=(pBody?.split('\n')[0])||'No content…';
+    });
+  }
+
+  render();
+})();
+</script>
